@@ -13,7 +13,7 @@ source /home/diegoa/dev/ilsanalyzer/ilsanalyzer.tcl
 #
 # GAUSSIAN KERNEL DENSITY ESTIMATION (KDE):
 # KDE is a method similar in purpuse to a histogram, so it can be used to obtain
-# probabilities distribution functions (in this case in three dimensions), and
+# probability distribution functions (in this case in three dimensions), and
 # so, by using the known formula G(x,y,z)=-RT ln( p(x,y,z) ) it is also possible to obtain
 # the equivalent free energy. The advantage of this method compared to a simple
 # histogram is that it can be shown that it converges much faster than the former
@@ -53,7 +53,7 @@ source /home/diegoa/dev/ilsanalyzer/ilsanalyzer.tcl
 #
 # MIGRATION PATHWAYS SEARCH
 # This functionality searches for minimum energy pathways between the aforementioned minima using an
-# algorithm similar to Nudged Elastic Band. This is, an initial pathway is drawn as an interpolation
+# algorithm similar to the Elastic Band methods. This is, an initial pathway is drawn as an interpolation
 # between the positions of two minima, and then they are subject to a restrained optimization, in
 # such a way that each intermediate point can only move on a plane (or more accurately, a thin slab)
 # perpendicular to the line passing through both minima.
