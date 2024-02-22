@@ -2,21 +2,21 @@
 
 puts "\nWelcome to";
 puts ""
-puts " _______    ______     ________  ______                                            "
-puts "/______/\  /_____/\   /_______/\/_____/\                                           "
-puts "\::::__\/__\:::_ \ \  \__.::._\/\:::_ \ \                                          "
-puts " \:\ /____/\\:(_) ) )_   \::\ \  \:\ \ \ \                                         "
-puts "  \:\\_  _\/ \: __ `\ \  _\::\ \__\:\ \ \ \                                        "
-puts "   \:\_\ \ \  \ \ `\ \ \/__\::\__/\\:\/.:| |                                       "
-puts " ___\_____\/___\_\/_\_\/\________\/_\____/_/__  __   ______  ______   ______       "
-puts "/_______/\ /__/\ /__/\ /_______/\ /_/\     /_/\/_/\ /_____/\/_____/\ /_____/\      "
-puts "\::: _  \ \\::\_\\  \ \\::: _  \ \\:\ \    \ \ \ \ \\:::__\/\::::_\/_\:::_ \ \     "
-puts " \::(_)  \ \\:. `-\  \ \\::(_)  \ \\:\ \    \:\_\ \ \  /: /  \:\/___/\\:(_) ) )_   "
-puts "  \:: __  \ \\:. _    \ \\:: __  \ \\:\ \____\::::_\/ /::/___ \::___\/_\: __ `\ \  "
-puts "   \:.\ \  \ \\. \`-\  \ \\:.\ \  \ \\:\/___/\ \::\ \/_:/____/\\:\____/\\ \ `\ \ \ "
-puts "    \__\/\__\/ \__\/ \__\/ \__\/\__\/ \_____\/  \__\/\_______\/ \_____\/ \_\/ \_\/ "
-puts "................................................................................"
-puts "....................................by...Diego J. Alonso de Armiño.......(2020)."
+puts { _______    ______     ________  ______                                            }
+puts {/______/\  /_____/\   /_______/\/_____/\                                           }
+puts {\::::__\/__\:::_ \ \  \__.::._\/\:::_ \ \                                          }
+puts { \:\ /____/\\:(_) ) )_   \::\ \  \:\ \ \ \                                         }
+puts {  \:\\_  _\/ \: __ `\ \  _\::\ \__\:\ \ \ \                                        }
+puts {   \:\_\ \ \  \ \ `\ \ \/__\::\__/\\:\/.:| |                                       }
+puts { ___\_____\/___\_\/_\_\/\________\/_\____/_/__  __   ______  ______   ______       }
+puts {/_______/\ /__/\ /__/\ /_______/\ /_/\     /_/\/_/\ /_____/\/_____/\ /_____/\      }
+puts {\::: _  \ \\::\_\\  \ \\::: _  \ \\:\ \    \ \ \ \ \\:::__\/\::::_\/_\:::_ \ \     }
+puts { \::(_)  \ \\:. `-\  \ \\::(_)  \ \\:\ \    \:\_\ \ \  /: /  \:\/___/\\:(_) ) )_   }
+puts {  \:: __  \ \\:. _    \ \\:: __  \ \\:\ \____\::::_\/ /::/___ \::___\/_\: __ `\ \  }
+puts {   \:.\ \  \ \\. \`-\  \ \\:.\ \  \ \\:\/___/\ \::\ \/_:/____/\\:\____/\\ \ `\ \ \ }
+puts {    \__\/\__\/ \__\/ \__\/ \__\/\__\/ \_____\/  \__\/\_______\/ \_____\/ \_\/ \_\/ }
+puts {................................................................................}
+puts {....................................by...Diego J. Alonso de Armiño.......(2020).}
 
 puts "\n\n- a programm that analyzes ligand migration thought 3D grids in .dx format-\n\n"
 
@@ -120,12 +120,15 @@ proc read_DX {a_dx_file} {
    # Reading inconsequential stuff.
    set InputLine [gets $in]
    set InputLine [gets $in]
-   set total [expr int($endgridX* $endgridY * $endgridZ / 3)]
+   # The variable total serves to figure the number of lines in the .dx file.
+   set total [expr int($endgridX* $endgridY * $endgridZ )]
+   set nlines [expr int($total / 3)]
 
    # Printing summary of .DX file prologue.
    puts "Dimensions = x:$endgridX y:$endgridY z:$endgridZ"
    puts "Origin: $xOrigen $yOrigen $zOrigen"
    puts "Resolution = x:$xdelta y:$ydelta z:$zdelta"
+   puts "Total number of grid points = $total"
    puts "Reading values..."
 
    # Now reading energy values.
@@ -134,7 +137,7 @@ proc read_DX {a_dx_file} {
    set c 2;
 
    set count 0
-   while {$count < $total} {
+   while {$count < $nlines} {
       set InputLine [gets $in]
       scan $InputLine "%e %e %e" v1 v2 v3
       set valList($a) $v1
@@ -145,14 +148,14 @@ proc read_DX {a_dx_file} {
       set c [expr $c+3]
       incr count
    }
-   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $total] == 2} {
+   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $nlines] == 2} {
       scan $InputLine "%e %e" v1 v2
       set valList($a) $v1
       set valList($b) $v2
       set a [expr $a+3]
       set b [expr $b+3]
    }
-   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $total] == 1} {
+   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $nlines] == 1} {
       scan $InputLine "%e"  v1
       set valList($a) $v1
       set a [expr $a+3]
@@ -170,7 +173,6 @@ proc read_DX {a_dx_file} {
    } } }
 
    puts "3D grid generated..."
-   puts "Searching for energy minima..."
 }
 
 ## lremove - remove items from a list
@@ -772,71 +774,51 @@ proc optimizer {ref_coord_x ref_coord_y ref_coord_z xOrigen yOrigen zOrigen xdel
    return [list $refx $refy $refz $Gmin]
 }
 
-proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ radius outfile} {
+proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ outfile} {
 
    # GLOBAL OPTIMIZATION
    # Given an initial position, creates a square grid of given radius around said position.
    # Each point in the grid is treated as a starting position for optimization using the
    # single point optimizer procedure.
    # All optmized positions are printed into a PDB file.
-
-
+   #
    # Due to limitations intrisic to TCL, it is impossible to pass array variables to a
    # procedure directly (Yeah! I know, right?). There are rather cumbersome ways to do it
    # but I'll risk just making these following variables global.
+   puts "Searching for energy minima..."
    global grilla
-
-   # Find the nearest grid point to a single reference coordinate.
-   # This is done by Ref = (x0 + DeltaX * gridx, y0 + DeltaY * gridy, z0 + DeltaZ * gridz)
-   # and finding the values of gridx, gridy and gridz by solving the linear equation.
-   # gridx, gridy and gridz are real values, but  we need intger values so we round off.
+   
    set opt_list [list ]
    set out_fh [open $outfile w]
-   foreach a $ref_coord_list {
-      # Convert reference coordinates from cartesian to grid indexes.
-      set refx [ expr {round( ([lindex $a 0] - $xOrigen)/$xdelta )} ]
-      set refy [ expr {round( ([lindex $a 1] - $yOrigen)/$ydelta )} ]
-      set refz [ expr {round( ([lindex $a 2] - $zOrigen)/$zdelta )} ]
+   set total [expr int($endgridX * $endgridY * $endgridZ )]
 
-      set minfound 0
-      set Gmin $grilla($refx,$refy,$refz)
-      set minx $refx
-      set miny $refy
-      set minz $refz
-      set total [ expr int((2*$radius+1)**3) ]
+   set minfound 0
+   set Gmin $grilla(0,0,0)
+   set minx 0
+   set miny 0
+   set minz 0
 
-      set cnt 1
-      for {set x [expr -1 * round($radius)]} {$x <= round($radius)} {incr x} {
-      for {set y [expr -1 * round($radius)]} {$y <= round($radius)} {incr y} {
-      for {set z [expr -1 * round($radius)]} {$z <= round($radius)} {incr z} {
-         # Convert initial coordinates from cartesian to grid indexes.
-         set inix [ expr $refx + round($x) ]
-         set iniy [ expr $refy + round($y) ]
-         set iniz [ expr $refz + round($z) ]
+   set cnt 1
+   for {set ndx_x 0} {$ndx_x < $endgridX} {incr ndx_x} {
+   for {set ndx_y 0} {$ndx_y < $endgridY} {incr ndx_y} {
+   for {set ndx_z 0} {$ndx_z < $endgridZ} {incr ndx_z} {
+      puts " $ndx_x  $ndx_y  $ndx_z "
+      puts ""
+      puts "POINT No $cnt / $total "
+      puts "Entering optimizer"
+      set opt [optimizer $ndx_x $ndx_y $ndx_z $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
+      puts "Finished optimizer"
+      set Gmin [lindex $opt 3]
+      if { $Gmin < 20.00 && [ lsearch $opt_list $opt ] == -1 } {
+         lappend opt_list $opt
+      }
+      set cnt [expr $cnt + 1]
+   }}}
+   puts "FINAL!"
 
-         if { $inix < 0 || $inix >= $endgridX } { continue }
-         if { $iniy < 0 || $iniy >= $endgridY } { continue }
-         if { $iniz < 0 || $iniz >= $endgridZ } { continue }
-
-         puts " $refx  $refy  $refz "
-         puts " $inix  $iniy  $iniz "
-
-         puts ""
-         puts "POINT No $cnt / $total"
-	 puts "Entering optimizer"
-         set opt [optimizer $inix $iniy $iniz $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
-	 puts "Finished optimizer"
-         set Gmin [lindex $opt 3]
-         if { $Gmin < 20.00 && [ lsearch $opt_list $opt ] == -1 } {
-            lappend opt_list $opt
-         }
-	 set cnt [expr $cnt + 1]
-      }}}
-   }
-#   puts $opt_list
    # Print PDB file with optimized geometries.
    set leaveopen 1
-   set outfile "min.pdb"
+#   set outfile "min.pdb"
    foreach a $opt_list {
       set minx [lindex $a 0]
       set miny [lindex $a 1]
