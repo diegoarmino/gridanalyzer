@@ -2,19 +2,19 @@
 
 puts "\nWelcome to";
 puts ""
-puts ' _______    ______     ________  ______                                            '
-puts '/______/\  /_____/\   /_______/\/_____/\                                           '
-puts '\::::__\/__\:::_ \ \  \__.::._\/\:::_ \ \                                          '
-puts ' \:\ /____/\\:(_) ) )_   \::\ \  \:\ \ \ \                                         '
-puts '  \:\\_  _\/ \: __ `\ \  _\::\ \__\:\ \ \ \                                        '
-puts '   \:\_\ \ \  \ \ `\ \ \/__\::\__/\\:\/.:| |                                       '
-puts ' ___\_____\/___\_\/_\_\/\________\/_\____/_/__  __   ______  ______   ______       '
-puts '/_______/\ /__/\ /__/\ /_______/\ /_/\     /_/\/_/\ /_____/\/_____/\ /_____/\      '
-puts '\::: _  \ \\::\_\\  \ \\::: _  \ \\:\ \    \ \ \ \ \\:::__\/\::::_\/_\:::_ \ \     '
-puts ' \::(_)  \ \\:. `-\  \ \\::(_)  \ \\:\ \    \:\_\ \ \  /: /  \:\/___/\\:(_) ) )_   '
-puts '  \:: __  \ \\:. _    \ \\:: __  \ \\:\ \____\::::_\/ /::/___ \::___\/_\: __ `\ \  '
-puts '   \:.\ \  \ \\. \`-\  \ \\:.\ \  \ \\:\/___/\ \::\ \/_:/____/\\:\____/\\ \ `\ \ \ '
-puts '    \__\/\__\/ \__\/ \__\/ \__\/\__\/ \_____\/  \__\/\_______\/ \_____\/ \_\/ \_\/ '
+puts " _______    ______     ________  ______                                            "
+puts "/______/\  /_____/\   /_______/\/_____/\                                           "
+puts "\::::__\/__\:::_ \ \  \__.::._\/\:::_ \ \                                          "
+puts " \:\ /____/\\:(_) ) )_   \::\ \  \:\ \ \ \                                         "
+puts "  \:\\_  _\/ \: __ `\ \  _\::\ \__\:\ \ \ \                                        "
+puts "   \:\_\ \ \  \ \ `\ \ \/__\::\__/\\:\/.:| |                                       "
+puts " ___\_____\/___\_\/_\_\/\________\/_\____/_/__  __   ______  ______   ______       "
+puts "/_______/\ /__/\ /__/\ /_______/\ /_/\     /_/\/_/\ /_____/\/_____/\ /_____/\      "
+puts "\::: _  \ \\::\_\\  \ \\::: _  \ \\:\ \    \ \ \ \ \\:::__\/\::::_\/_\:::_ \ \     "
+puts " \::(_)  \ \\:. `-\  \ \\::(_)  \ \\:\ \    \:\_\ \ \  /: /  \:\/___/\\:(_) ) )_   "
+puts "  \:: __  \ \\:. _    \ \\:: __  \ \\:\ \____\::::_\/ /::/___ \::___\/_\: __ `\ \  "
+puts "   \:.\ \  \ \\. \`-\  \ \\:.\ \  \ \\:\/___/\ \::\ \/_:/____/\\:\____/\\ \ `\ \ \ "
+puts "    \__\/\__\/ \__\/ \__\/ \__\/\__\/ \_____\/  \__\/\_______\/ \_____\/ \_\/ \_\/ "
 puts "................................................................................"
 puts "....................................by...Diego J. Alonso de Armiño.......(2020)."
 
@@ -793,6 +793,7 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
    set opt_list [list ]
    set out_fh [open $outfile w]
    foreach a $ref_coord_list {
+      # Convert reference coordinates from cartesian to grid indexes.
       set refx [ expr {round( ([lindex $a 0] - $xOrigen)/$xdelta )} ]
       set refy [ expr {round( ([lindex $a 1] - $yOrigen)/$ydelta )} ]
       set refz [ expr {round( ([lindex $a 2] - $zOrigen)/$zdelta )} ]
@@ -808,20 +809,23 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
       for {set x [expr -1 * round($radius)]} {$x <= round($radius)} {incr x} {
       for {set y [expr -1 * round($radius)]} {$y <= round($radius)} {incr y} {
       for {set z [expr -1 * round($radius)]} {$z <= round($radius)} {incr z} {
-         puts ""
-         puts "POINT No $cnt / $total"
+         # Convert initial coordinates from cartesian to grid indexes.
          set inix [ expr $refx + round($x) ]
          set iniy [ expr $refy + round($y) ]
          set iniz [ expr $refz + round($z) ]
 
-#         puts " $refx  $refy  $refz "
-#         puts " $inix  $iniy  $iniz "
+         if { $inix < 0 || $inix >= $endgridX } { continue }
+         if { $iniy < 0 || $iniy >= $endgridY } { continue }
+         if { $iniz < 0 || $iniz >= $endgridZ } { continue }
 
-         if { $inix < 0 || $inix > $endgridX } { continue }
-         if { $iniy < 0 || $iniy > $endgridY } { continue }
-         if { $iniz < 0 || $iniz > $endgridZ } { continue }
+         puts " $refx  $refy  $refz "
+         puts " $inix  $iniy  $iniz "
 
+         puts ""
+         puts "POINT No $cnt / $total"
+	 puts "Entering optimizer"
          set opt [optimizer $inix $iniy $iniz $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
+	 puts "Finished optimizer"
          set Gmin [lindex $opt 3]
          if { $Gmin < 20.00 && [ lsearch $opt_list $opt ] == -1 } {
             lappend opt_list $opt
