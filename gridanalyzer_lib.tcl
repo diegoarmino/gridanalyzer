@@ -173,6 +173,7 @@ proc read_DX {a_dx_file} {
    } } }
 
    puts "3D grid generated..."
+   close $in
 }
 
 ## lremove - remove items from a list
@@ -887,10 +888,11 @@ proc is_inside {border1_x border1_y border1_z border2_x border2_y border2_z poin
 
 proc NEB_optimizer {ref_indx_x ref_indx_y ref_indx_z \
                     xOrigen yOrigen zOrigen \
-          xdelta ydelta zdelta \
-          pnt \
-          border_list_x border_list_y border_list_z \
-          line_x line_y line_z} {
+                    xdelta ydelta zdelta \
+                    pnt \
+                    border_list_x border_list_y border_list_z \
+                    line_x line_y line_z \
+	            } {
 
    # NEB OPTIMIZER
    # Optimization of a single point between two planes defined by two points and a vector.
@@ -901,6 +903,9 @@ proc NEB_optimizer {ref_indx_x ref_indx_y ref_indx_z \
    # procedure directly (Yeah! I know, right?). There are rather cumbersome ways to do it
    # but I'll risk just making this following variable global.
    global grilla
+   global endgridX
+   global endgridY
+   global endgridZ
 
    set refx $ref_indx_x
    set refy $ref_indx_y
@@ -930,6 +935,12 @@ proc NEB_optimizer {ref_indx_x ref_indx_y ref_indx_z \
                set testx [expr $refx + $xx]
                set testy [expr $refy + $yy]
                set testz [expr $refz + $zz]
+
+	       # Test if new test point is inside grid limits.
+               if {$testx < 0 || ($testx >= $endgridX)} {puts "Point out of grid in X. Ignoring.";continue}
+               if {$testy < 0 || ($testy >= $endgridY)} {puts "Point out of grid in Y. Ignoring.";continue}
+               if {$testz < 0 || ($testz >= $endgridZ)} {puts "Point out of grid in Z. Ignoring.";continue}
+
                set test_pos_x [get_position_from_index  $testx $xdelta $xOrigen]
                set test_pos_y [get_position_from_index  $testy $ydelta $yOrigen]
                set test_pos_z [get_position_from_index  $testz $zdelta $zOrigen]
@@ -986,9 +997,9 @@ proc grid_NEB {pos1x pos1y pos1z pos2x pos2y pos2z xOrigen yOrigen zOrigen xdelt
    set indx_end_y [ expr {round( ($pos2y - $yOrigen)/$ydelta )} ]
    set indx_end_z [ expr {round( ($pos2z - $zOrigen)/$zdelta )} ]
 
-   set indx_x [ list [ expr {round( ($posRx -$xOrigen)/$xdelta )} ] ]
-   set indx_y [ list [ expr {round( ($posRy -$xOrigen)/$ydelta )} ] ]
-   set indx_z [ list [ expr {round( ($posRz -$xOrigen)/$zdelta )} ] ]
+   set indx_x [ list [ expr {round( ($posRx - $xOrigen)/$xdelta )} ] ]
+   set indx_y [ list [ expr {round( ($posRy - $xOrigen)/$ydelta )} ] ]
+   set indx_z [ list [ expr {round( ($posRz - $xOrigen)/$zdelta )} ] ]
 
 ############################################################################
 #  GENERATE A LINEAR STRING OF POINTS CONNECTING INITIAL AND FINAL POSITIONS
@@ -1231,8 +1242,8 @@ proc search_pathways { start_indx_list opt_file pathway_file } {
 
    mol new $opt_file type {pdb} first 0 last -1 step 1 waitfor 1
 
-   set out_fh1 [open "wat_kde_borders.pdb" w]
-   set out_fh2 [open "wat_kde_initial_path.pdb" w]
+   set out_fh1 [open "borders.pdb" w]
+   set out_fh2 [open "initial_path.pdb" w]
    set out_fh3 [open $pathway_file w]
    set out_netw [open "network.dat" w]
    puts $out_netw "index1 index2 G1 G2 G= Gact1 Gact2 K1 K2 k1_283 k1_298 k1_323 k2_283 k2_298 k2_323"
@@ -1261,11 +1272,61 @@ proc search_pathways { start_indx_list opt_file pathway_file } {
       set npnts [ grid_NEB $pos1x $pos1y $pos1z  $pos2x $pos2y $pos2z \
                            $xOrigen $yOrigen $zOrigen \
                            $xdelta $ydelta $zdelta \
-                           $out_fh3 $out_fh2 $out_fh1 $out_netw\
+                           $out_fh3 $out_fh2 $out_fh1 $out_netw \
                            $ntot $ini $end $ene_ini $ene_end ]
       set ntot [expr { $ntot + $npnts } ]
       set cnt [expr $cnt + 1]
    }
+
+   close $out_fh3
+   close $out_fh2
+   close $out_fh1
+   close $out_netw
+}
+
+proc search_pathways2 { start_indx end_indx opt_molID pathway_file } {
+# MAIN PROCEDURE TO SEARCH FOR PATHWAYS BETWEEN MINIMA.
+# USE THIS PROCEDURE AS A COMMAND.
+
+   global xOrigen
+   global yOrigen
+   global zOrigen
+   global xdelta
+   global ydelta
+   global zdelta
+   global minlist
+   global connect_list
+
+   set out_fh1 [open "borders.pdb" w]
+   set out_fh2 [open "initial_path.pdb" w]
+   set out_fh3 [open $pathway_file a]
+   set out_netw [open "network.dat" a]
+#   puts $out_netw "#index1 index2     G1     G2     G=     Gact1      Gact2 K1 K2 k1_283 k1_298 k1_323 k2_283 k2_298 k2_323"
+
+   set connect_list [list ]
+   set cnt 1
+   set ntot 0
+
+   set sel_ini [ atomselect $opt_molID "index $start_indx" ]
+   set sel_end [ atomselect $opt_molID "index $end_indx" ]
+   set ene_ini [ $sel_ini get occupancy ]
+   set ene_end [ $sel_end get occupancy ]
+   set pos1 [ $sel_ini get {x y z} ]
+   set pos2 [ $sel_end get {x y z} ]
+   set pos1x [lindex $pos1 0 0]
+   set pos1y [lindex $pos1 0 1]
+   set pos1z [lindex $pos1 0 2]
+   set pos2x [lindex $pos2 0 0]
+   set pos2y [lindex $pos2 0 1]
+   set pos2z [lindex $pos2 0 2]
+#   puts "inside searchpathways2: pos1 is: $pos1"
+#   puts "inside searchpathways2: start_indx is: $start_indx"
+#   puts "inside searchpathways2: end_indx is: $end_indx"
+   set npnts [ grid_NEB $pos1x $pos1y $pos1z  $pos2x $pos2y $pos2z \
+                        $xOrigen $yOrigen $zOrigen \
+                        $xdelta $ydelta $zdelta \
+                        $out_fh3 $out_fh2 $out_fh1 $out_netw \
+                        $ntot $start_indx $end_indx $ene_ini $ene_end ]
 
    close $out_fh3
    close $out_fh2
@@ -1329,3 +1390,263 @@ proc kde_analysis_preparation { selection batch max_frames top traj output do_bu
    exec cat tmp2 tmp1 > "${output}.xyz"
 
 }
+
+################################################################################################
+#   KDE ANALYSIS FOR BOOTSTRAPPING 
+################################################################################################
+#
+#
+#
+
+proc bootstrap_kde_preparation { selection inpdb output } {
+#  -----------------------------------------------------------------------------------------------
+#  This subroutine generates an xyz file appropriate for input 
+#  into KDE analysis (fortran) program.
+#  -----------------------------------------------------------------------------------------------
+
+   # LOAD INPUT PDB file and save molID into molID variable.
+   set molID [ mol new $inpdb autobonds off type pdb ]
+   # Select relevant atoms (all in most cases).
+   set sel [ atomselect $molID $selection ]
+   # Remove output file if present.
+   exec rm -rf $output
+   # Set format of output file.
+   set fmt "%11.5f%11.5f%11.5f"
+   # Set filehandle for output file (temporary).
+   set fh [ open "tmp1" w ]
+   # Initialize line counter.
+   set kde_line_cnt 0
+   # Read all x y z coordinates from PDB input file.
+   set xyz_list [ $sel get {x y z} ]
+
+   # Loop over each "atom" in PDB file and print to file.
+   foreach a $xyz_list {
+      set x [ lindex $a 0 ]
+      set y [ lindex $a 1 ]
+      set z [ lindex $a 2 ]
+      puts $fh [ format $fmt $x $y $z ]
+      set kde_line_cnt [expr $kde_line_cnt + 1]
+   }
+
+   # Measure box size. Minmax has two sets of coordinates. The first is defined as the origin.
+   # The second is defined as the end of the box.
+   set minmax [ measure minmax $sel ]
+
+   # Print box information into temporary output file.
+   set fh2 [open "tmp2" w]
+   puts $fh2 [format $fmt [lindex $minmax 0 0] [lindex $minmax 0 1] [lindex $minmax 0 2] ]
+   puts $fh2 [format $fmt [lindex $minmax 1 0] [lindex $minmax 1 1] [lindex $minmax 1 2] ]
+
+   # Close output file.
+   close $fh
+   close $fh2
+
+   # Delete previous final output files if present.
+   exec rm -rf "${output}.xyz"
+   # Combine previously generated temporary output files into final output.
+   exec cat tmp2 tmp1 > "${output}.xyz"
+
+   # Keep our nose clean. Delete molID and selection.
+   mol delete $molID
+   $sel delete
+
+
+   return $kde_line_cnt
+}
+
+proc load_LIS_pdb {a_pdb_file} {
+   # LOAD A PDB FILE WITH PROTEIN STRUCTURE INTO VMD
+   if {[file exists $a_pdb_file] == 1} {
+      axes location Off
+      set molID [ mol new $a_pdb_file type pdb autobonds off ]
+      mol modstyle 0 $molID Lines 
+      display projection Orthographic
+      #
+      set pdb_ok 1;
+   } else {
+      puts "File not found. Exiting..."
+      quit
+   }
+   return $molID
+}
+
+proc load_LIS_pdb2 {a_pdb_file stdev} {
+   # LOAD A PDB FILE WITH PROTEIN STRUCTURE INTO VMD
+   if {[file exists $a_pdb_file] == 1} {
+      set molID [ mol new $a_pdb_file type pdb autobonds off ]
+      mol modstyle 0 $molID VDW $stdev 12.000000
+      mol modmaterial 0 $molID Transparent
+      mol addrep $molID
+      mol modstyle 1 $molID VDW 0.1 12.0000
+      mol modmaterial 1 $molID AOChalky
+      set pdb_ok 1;
+   } else {
+      puts "File not found. Exiting..."
+      quit
+   }
+   return $molID
+}
+
+
+proc LIS_selection { pdb_in molID xyz_REF_list cutoff out_name pdb_fh } {
+   # global pdb_fh
+   # Load PDB with LIS 
+   # set molID [ load_LIS_pdb $pdb_in ]
+   # Select relevant atoms (all in most cases).
+   set sel [ atomselect $molID "all" ]
+   # Read all x y z coordinates from PDB input file.
+   set xyz_LIS_list [ $sel get {x y z} ]
+
+   set indx_cnt 0
+   set indx_list {}
+   set coord_list {}
+
+   # For each resampled LIS thest if its xyz coords are within
+   # cutoff of reference xyz coordinates
+   
+   # Loop through LIS xyz coords.
+   foreach p $xyz_LIS_list {
+      set lis_x [ lindex $p 0 ]
+      set lis_y [ lindex $p 1 ]
+      set lis_z [ lindex $p 2 ]
+
+      # Loop through reference xyz coords.
+      foreach a $xyz_REF_list {
+         set ref_x [ lindex $a 0 ]
+         set ref_y [ lindex $a 1 ]
+         set ref_z [ lindex $a 2 ]
+
+	 # Compute LIS-REF cartesian distance.
+         set dist [ distance $ref_x $ref_y $ref_z $lis_x $lis_y $lis_z ] 
+
+         # If distance of LIS to REF is less than cutoff store 
+	 # index and xyz coordinates into corresponding lists.
+         if { $dist < $cutoff } {
+            lappend indx_list $indx_cnt
+	    lappend cummul_x $lis_x 
+	    lappend cummul_y $lis_y 
+	    lappend cummul_z $lis_z 
+         }
+      }
+   # Update index count.
+   set indx_cnt [ expr $indx_cnt + 1 ]
+   }
+   # Eliminate possible duplicates from index list.
+   set indx_list [ lsort -unique $indx_list ]
+
+   # Write PDB with corresponding LIS resamples.
+   set sel_text [ join $indx_list ]
+   set sel_out [ atomselect $molID "index $sel_text" ]
+   $sel_out writepdb $out_name.pdb
+
+   # Statistical analysis of possition.
+   set mean_x [ math::statistics::mean $cummul_x ]
+   set mean_y [ math::statistics::mean $cummul_y ]
+   set mean_z [ math::statistics::mean $cummul_z ]
+   set stdev_x [ math::statistics::stdev $cummul_x ]
+   set stdev_y [ math::statistics::stdev $cummul_y ]
+   set stdev_z [ math::statistics::stdev $cummul_z ]
+
+   # Statistical analysis of Energy
+   set occ [ $sel_out get occupancy ]
+   set stdev_E [math::statistics::stdev $occ]
+   set mean_E [math::statistics::mean $occ]
+   set conf_E [math::statistics::interval-mean-stdev $occ 0.95]
+   set quant_E [math::statistics::quantiles $occ {0.025 0.975} ]
+   puts "Mean +- Stdev"
+   puts "$mean_E +- $stdev_E"
+   puts "Confidence Interval"
+   puts "$conf_E"
+   set fmt_e "%3s %8.3f%8.3f%40s"
+   set fhe [ open LIS_energies.dat a ]
+   puts $fhe [ format $fmt_e $out_name $mean_E $stdev_E $quant_E ]
+   close $fhe
+
+   # Print results
+   #set pdb_fh [ open "meanLIS_$out_name.pdb" "w" ]
+#   exec rm -f meanLIS.pdb
+#   if { $is_file_open == 0 } {
+#      global pdb_fh
+#      puts "INSIDE IF!!!!!!!!!"
+#      set pdb_fh [ open "meanLIS.pdb" "w" ]
+#      puts "pdb_fh = $pdb_fh"
+#   }
+   #set fmtdx "ATOM   1129 %3s  MIN 6 481    %8.3f%8.3f%8.3f%5.2f  0.00"
+   set fmtdx "ATOM   1129 %3s  MIN 6 481    %8.3f%8.3f%8.3f%6.2f%6.2f"
+   set xyz_stdev [ expr { sqrt( $stdev_x**2 + $stdev_y**2 + $stdev_z**2 ) } ]
+   puts $pdb_fh [ format $fmtdx $out_name $mean_x $mean_y $mean_z $xyz_stdev $mean_E ]
+   #close $pdb_fh
+   puts $xyz_stdev
+#   load_LIS_pdb2 "meanLIS_$out_name.pdb" $xyz_stdev
+#   load_LIS_pdb2 "meanLIS.pdb" $xyz_stdev
+
+   # Load into VMD
+   #
+   set fhdl [open ene "w"]
+   foreach val $occ {
+      puts $fhdl $val
+   }
+   close $fhdl
+   puts $quant_E
+   puts $out_name
+
+
+#   puts $occ
+
+}
+
+proc LIS_exists { molID xyz_REF_list cutoff } {
+   # LOADS A RESAMPLE PDB FILE WITH LISs AND DETERMINES IF A SET OF  REFERENCE 
+   # XYZ COORDINATES EXISTS IN SAID RESAMPLE INSTANCE.
+   # RETURNS INDEX LIST OF LISs ACTUALLY PRESENT IN REFFERENCE RESAMPLE.
+
+   # Load PDB containing LISs obtained from a certain resample.
+   # set molID [ load_LIS_pdb $pdb_in ]
+   # Select relevant atoms (all in most cases).
+   set sel [ atomselect $molID "all" ]
+   # Read all x y z coordinates from PDB input file.
+   set xyz_LIS_list [ $sel get {x y z} ]
+
+   set indx_cnt 0
+   set indx_list {}
+   set coord_list {}
+
+   # For each resampled LIS thest if its xyz coords are within
+   # cutoff of reference xyz coordinates
+   
+   # Loop through LIS xyz coords.
+   foreach p $xyz_LIS_list {
+      set lis_x [ lindex $p 0 ]
+      set lis_y [ lindex $p 1 ]
+      set lis_z [ lindex $p 2 ]
+
+      # Loop through reference xyz coords.
+      foreach a $xyz_REF_list {
+         set ref_x [ lindex $a 0 ]
+         set ref_y [ lindex $a 1 ]
+         set ref_z [ lindex $a 2 ]
+
+	 # Compute LIS-REF cartesian distance.
+         set dist [ distance $ref_x $ref_y $ref_z $lis_x $lis_y $lis_z ] 
+
+         # If distance of LIS to REF is less than cutoff store 
+	 # index and xyz coordinates into corresponding lists.
+         if { $dist < $cutoff } {
+            lappend indx_list $indx_cnt
+	    lappend cummul_x $lis_x 
+	    lappend cummul_y $lis_y 
+	    lappend cummul_z $lis_z 
+         }
+      }
+      # Update index count.
+      set indx_cnt [ expr $indx_cnt + 1 ]
+   }
+
+   set indx_list [ lsort -unique $indx_list ]
+   $sel delete
+   
+#   puts "inside subroutine indx_list: $indx_list"
+   return $indx_list
+
+}
+
