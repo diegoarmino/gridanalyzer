@@ -1149,9 +1149,11 @@ proc grid_NEB {pos1x pos1y pos1z pos2x pos2y pos2z xOrigen yOrigen zOrigen xdelt
    }
 #   close $out_fh2
    set enefh [open "energy_profile_${ini}_${end}.dat" w]
+   set epfh [open "pathway_tmp.ene" a]
    set fmt "ATOM  %5d  N   MIN %5d    %8.3f%8.3f%8.3f %5.2f  0.00"
    set fmtene "%5d %5d  %8.3f"
    set fmtcon "CONECT  %4d %4d %4d %4d "
+   set energy_path {}
    for {set i 0} {$i < [llength $min_list_x]} {incr i} {
       set Gmin [ lindex $Gmin_list $i ]
       set x [ lindex $min_list_x $i ]
@@ -1161,10 +1163,13 @@ proc grid_NEB {pos1x pos1y pos1z pos2x pos2y pos2z xOrigen yOrigen zOrigen xdelt
       print_pdb $out_fh3 $xOrigen $yOrigen $zOrigen $x $y $z $xdelta $ydelta $zdelta $Gmin $index 1
       # Print energy profiles
       if { $i == 0 } {
+	 puts -nonewline $epfh [ format "%8.4f" $ene_ini ]
          puts $enefh [ format $fmtene $ini $end $ene_ini ]
       } elseif { $i == [expr [llength $min_list_x]-1] } {
+	 puts $epfh [ format "%8.4f" $ene_end ]
          puts $enefh [ format $fmtene $ini $end $ene_end ]
       } else {
+	 puts -nonewline $epfh [ format "%8.4f" $Gmin ]
          puts $enefh [ format $fmtene $ini $end $Gmin ]
       }
 
@@ -1178,13 +1183,17 @@ proc grid_NEB {pos1x pos1y pos1z pos2x pos2y pos2z xOrigen yOrigen zOrigen xdelt
       }
    }
    close $enefh
+   close $epfh
 
    # Computing transition state energies, activation energies, 
    # kinetic constants and equilibrium constants.
 
    # Transition state energy
-   puts "LIST OF PATHWAY ENERGIES"
+#   puts "LIST OF PATHWAY ENERGIES"
+   set epfh2 [open "pathway_tmp2.ene" a]
+   puts $epfh2 $Gmin_list
    puts $Gmin_list
+   close $epfh2
    set Gts [tcl::mathfunc::max {*}$Gmin_list] 
    puts "TRANSITION STATE ENERGY"
    puts $Gts
@@ -1499,7 +1508,6 @@ proc LIS_selection { pdb_in molID xyz_REF_list cutoff out_name pdb_fh } {
 
    set indx_cnt 0
    set indx_list {}
-   set coord_list {}
 
    # For each resampled LIS thest if its xyz coords are within
    # cutoff of reference xyz coordinates
@@ -1552,14 +1560,16 @@ proc LIS_selection { pdb_in molID xyz_REF_list cutoff out_name pdb_fh } {
    set stdev_E [math::statistics::stdev $occ]
    set mean_E [math::statistics::mean $occ]
    set conf_E [math::statistics::interval-mean-stdev $occ 0.95]
-   set quant_E [math::statistics::quantiles $occ {0.025 0.975} ]
+   set quant_low_E [math::statistics::quantiles $occ 0.025 ]
+   set quant_high_E [math::statistics::quantiles $occ 0.975 ]
    puts "Mean +- Stdev"
    puts "$mean_E +- $stdev_E"
    puts "Confidence Interval"
    puts "$conf_E"
-   set fmt_e "%3s %8.3f%8.3f%40s"
+   set fmt_e "%3s %8.4f%8.4f%8.4f%8.4f"
    set fhe [ open LIS_energies.dat a ]
-   puts $fhe [ format $fmt_e $out_name $mean_E $stdev_E $quant_E ]
+   puts $fhe "LIS    Mean   StdDev   95% ConfInt"
+   puts $fhe [ format $fmt_e $out_name $mean_E $stdev_E $quant_low_E $quant_high_E ]
    close $fhe
 
    # Print results
@@ -1587,7 +1597,8 @@ proc LIS_selection { pdb_in molID xyz_REF_list cutoff out_name pdb_fh } {
       puts $fhdl $val
    }
    close $fhdl
-   puts $quant_E
+   puts "95% Confidence Interval"
+   puts "$quant_low_E $quant_high_E"
    puts $out_name
 
 
