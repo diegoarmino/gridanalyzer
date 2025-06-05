@@ -704,7 +704,7 @@ proc KDEanalysis { pdbin dxout minmax delta sigma } {
 ##                             MINIMA SEARCH                                            ##
 ##########################################################################################
 
-proc optimizer {ref_coord_x ref_coord_y ref_coord_z xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ } {
+proc optimizer {ref_index_x ref_index_y ref_index_z xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ } {
 
    # MAIN OPTIMIZER
    # Given an initial position, finds the nearest representation of it in the ILS grid
@@ -722,9 +722,9 @@ proc optimizer {ref_coord_x ref_coord_y ref_coord_z xOrigen yOrigen zOrigen xdel
    #set refx [ expr {int( ($ref_coord_x - $xOrigen)/$xdelta )} ]
    #set refy [ expr {int( ($ref_coord_y - $yOrigen)/$ydelta )} ]
    #set refz [ expr {int( ($ref_coord_z - $zOrigen)/$zdelta )} ]
-   set refx $ref_coord_x
-   set refy $ref_coord_y
-   set refz $ref_coord_z
+   set refx $ref_index_x
+   set refy $ref_index_y
+   set refz $ref_index_z
 
    set minfound 0
 #   puts "$refx $refy $refz exists? ->> [ info exists $grilla($refx,$refy,$refz) ]"
@@ -738,7 +738,7 @@ proc optimizer {ref_coord_x ref_coord_y ref_coord_z xOrigen yOrigen zOrigen xdel
    set cnt 1
    while { $minfound == 0 } {
       set moved 0
-      puts "Starting step no $cnt"
+      #puts "Starting step no $cnt"
       foreach zz [list -1 0 1] {
          foreach yy [list -1 0 1] {
             foreach xx [list -1 0 1] {
@@ -768,7 +768,7 @@ proc optimizer {ref_coord_x ref_coord_y ref_coord_z xOrigen yOrigen zOrigen xdel
          set refz $minz
       } else {
          set minfound 1
-         puts "Minimum found!"
+         #puts "Minimum found!"
       }
       set cnt [expr $cnt + 1]
    }
@@ -803,12 +803,12 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
    for {set ndx_x 0} {$ndx_x < $endgridX} {incr ndx_x} {
    for {set ndx_y 0} {$ndx_y < $endgridY} {incr ndx_y} {
    for {set ndx_z 0} {$ndx_z < $endgridZ} {incr ndx_z} {
-      puts " $ndx_x  $ndx_y  $ndx_z "
+      #puts " $ndx_x  $ndx_y  $ndx_z "
       puts ""
       puts "POINT No $cnt / $total "
-      puts "Entering optimizer"
+      #puts "Entering optimizer"
       set opt [optimizer $ndx_x $ndx_y $ndx_z $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
-      puts "Finished optimizer"
+      #puts "Finished optimizer"
       set Gmin [lindex $opt 3]
       if { $Gmin < 20.00 && [ lsearch $opt_list $opt ] == -1 } {
          lappend opt_list $opt
@@ -825,7 +825,8 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
       set miny [lindex $a 1]
       set minz [lindex $a 2]
       set Gmin [lindex $a 3]
-#      puts "$minx $miny $minz $Gmin"
+      #puts "$minx $miny $minz $Gmin"
+      #puts "DEBUG: Deltas before PDB print: x=$xdelta y=$ydelta z=$zdelta"
       print_pdb $out_fh $xOrigen $yOrigen $zOrigen $minx $miny $minz $xdelta $ydelta $zdelta $Gmin $cnt $leaveopen
    }
    close $out_fh
@@ -840,7 +841,8 @@ proc print_pdb {out_fh xOrigen yOrigen zOrigen refx refy refz xdelta ydelta zdel
    set pos_y [expr $yOrigen + $refy * $ydelta];
    set pos_z [expr $zOrigen + $refz * $zdelta];
 
-   puts $out_fh [format $fmt $g $g $pos_x $pos_y $pos_z $Gmin ]
+   #puts $out_fh [format $fmt $g $g $pos_x $pos_y $pos_z $Gmin ]
+   puts $out_fh [format $fmt 1 1 $pos_x $pos_y $pos_z $Gmin ]
 }
 
 
