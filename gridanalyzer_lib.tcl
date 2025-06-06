@@ -120,8 +120,9 @@ proc read_DX {a_dx_file} {
    # Reading inconsequential stuff.
    set InputLine [gets $in]
    set InputLine [gets $in]
-   # The variable total serves to figure the number of lines in the .dx file.
-   set total [expr int($endgridX* $endgridY * $endgridZ )]
+
+   # Total number of grid points.
+   set total [expr $endgridX * $endgridY * $endgridZ]
    set nlines [expr int($total / 3)]
 
    # Printing summary of .DX file prologue.
@@ -129,37 +130,37 @@ proc read_DX {a_dx_file} {
    puts "Origin: $xOrigen $yOrigen $zOrigen"
    puts "Resolution = x:$xdelta y:$ydelta z:$zdelta"
    puts "Total number of grid points = $total"
-   puts "Reading values..."
 
-   # Now reading energy values.
-   set a 0;
-   set b 1;
-   set c 2;
-
-   set count 0
-   while {$count < $nlines} {
+   # In read_DX, simplified valList population:
+   puts "Total number of grid points = $total"
+   puts "Reading $total values..."
+   unset -nocomplain valList
+   set current_val_idx 0
+   while {$current_val_idx < $total} {
+      if {[eof $in]} {
+         puts stderr "Error: Unexpected EOF. Read $current_val_idx values, expected $total."
+         close $in 
+         return 0 
+      }
       set InputLine [gets $in]
-      scan $InputLine "%e %e %e" v1 v2 v3
-      set valList($a) $v1
-      set valList($b) $v2
-      set valList($c) $v3
-      set a [expr $a+3]
-      set b [expr $b+3]
-      set c [expr $c+3]
-      incr count
+      set values_on_line [regexp -inline -all {\S+} $InputLine]
+      foreach val $values_on_line {
+         puts $values_on_line
+         if {$current_val_idx < $total} {
+               set valList($current_val_idx) $val
+               incr current_val_idx
+         } else {
+               break 
+         }
+      }
    }
-   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $nlines] == 2} {
-      scan $InputLine "%e %e" v1 v2
-      set valList($a) $v1
-      set valList($b) $v2
-      set a [expr $a+3]
-      set b [expr $b+3]
+   if {$current_val_idx != $total} {
+      puts stderr "Error: Read $current_val_idx values, but expected $total values after processing all lines."
+      close $in 
+      return 0
    }
-   if {[expr $endgridX * $endgridY * $endgridZ - 3 * $nlines] == 1} {
-      scan $InputLine "%e"  v1
-      set valList($a) $v1
-      set a [expr $a+3]
-   }
+   puts "Loaded all $total energy values into 1D list."
+   # ... then the correct grilla population loop ...
 
    puts "Loaded all energy values."
 
@@ -704,7 +705,7 @@ proc KDEanalysis { pdbin dxout minmax delta sigma } {
 ##                             MINIMA SEARCH                                            ##
 ##########################################################################################
 
-proc optimizer {ref_index_x ref_index_y ref_index_z xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ } {
+proc optimizer {ref_indx_x ref_indx_y ref_indx_z xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ } {
 
    # MAIN OPTIMIZER
    # Given an initial position, finds the nearest representation of it in the ILS grid
@@ -722,9 +723,9 @@ proc optimizer {ref_index_x ref_index_y ref_index_z xOrigen yOrigen zOrigen xdel
    #set refx [ expr {int( ($ref_coord_x - $xOrigen)/$xdelta )} ]
    #set refy [ expr {int( ($ref_coord_y - $yOrigen)/$ydelta )} ]
    #set refz [ expr {int( ($ref_coord_z - $zOrigen)/$zdelta )} ]
-   set refx $ref_index_x
-   set refy $ref_index_y
-   set refz $ref_index_z
+   set refx $ref_indx_x
+   set refy $ref_indx_y
+   set refz $ref_indx_z
 
    set minfound 0
 #   puts "$refx $refy $refz exists? ->> [ info exists $grilla($refx,$refy,$refz) ]"
@@ -804,7 +805,7 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
    for {set ndx_y 0} {$ndx_y < $endgridY} {incr ndx_y} {
    for {set ndx_z 0} {$ndx_z < $endgridZ} {incr ndx_z} {
       #puts " $ndx_x  $ndx_y  $ndx_z "
-      puts ""
+      #puts ""
       puts "POINT No $cnt / $total "
       #puts "Entering optimizer"
       set opt [optimizer $ndx_x $ndx_y $ndx_z $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
@@ -825,8 +826,7 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
       set miny [lindex $a 1]
       set minz [lindex $a 2]
       set Gmin [lindex $a 3]
-      #puts "$minx $miny $minz $Gmin"
-      #puts "DEBUG: Deltas before PDB print: x=$xdelta y=$ydelta z=$zdelta"
+      puts "$minx $miny $minz $Gmin"
       print_pdb $out_fh $xOrigen $yOrigen $zOrigen $minx $miny $minz $xdelta $ydelta $zdelta $Gmin $cnt $leaveopen
    }
    close $out_fh
@@ -841,7 +841,6 @@ proc print_pdb {out_fh xOrigen yOrigen zOrigen refx refy refz xdelta ydelta zdel
    set pos_y [expr $yOrigen + $refy * $ydelta];
    set pos_z [expr $zOrigen + $refz * $zdelta];
 
-   #puts $out_fh [format $fmt $g $g $pos_x $pos_y $pos_z $Gmin ]
    puts $out_fh [format $fmt 1 1 $pos_x $pos_y $pos_z $Gmin ]
 }
 
