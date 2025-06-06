@@ -145,7 +145,6 @@ proc read_DX {a_dx_file} {
       set InputLine [gets $in]
       set values_on_line [regexp -inline -all {\S+} $InputLine]
       foreach val $values_on_line {
-         puts $values_on_line
          if {$current_val_idx < $total} {
                set valList($current_val_idx) $val
                incr current_val_idx
@@ -160,10 +159,9 @@ proc read_DX {a_dx_file} {
       return 0
    }
    puts "Loaded all $total energy values into 1D list."
-   # ... then the correct grilla population loop ...
 
-   puts "Loaded all energy values."
-
+   # Populating 3D grid.
+   puts "Generating 3D grid..."
    set v 0
    for {set i 0} {$i < $endgridX} {incr i} {
    for {set j 0} {$j < $endgridY} {incr j} {
@@ -705,7 +703,7 @@ proc KDEanalysis { pdbin dxout minmax delta sigma } {
 ##                             MINIMA SEARCH                                            ##
 ##########################################################################################
 
-proc optimizer {ref_indx_x ref_indx_y ref_indx_z xOrigen yOrigen zOrigen xdelta ydelta zdelta endgridX endgridY endgridZ } {
+proc optimizer {ref_indx_x ref_indx_y ref_indx_z endgridX endgridY endgridZ } {
 
    # MAIN OPTIMIZER
    # Given an initial position, finds the nearest representation of it in the ILS grid
@@ -720,9 +718,6 @@ proc optimizer {ref_indx_x ref_indx_y ref_indx_z xOrigen yOrigen zOrigen xdelta 
    # but I'll risk just making these following variables global.
    global grilla
 
-   #set refx [ expr {int( ($ref_coord_x - $xOrigen)/$xdelta )} ]
-   #set refy [ expr {int( ($ref_coord_y - $yOrigen)/$ydelta )} ]
-   #set refz [ expr {int( ($ref_coord_z - $zOrigen)/$zdelta )} ]
    set refx $ref_indx_x
    set refy $ref_indx_y
    set refz $ref_indx_z
@@ -744,13 +739,24 @@ proc optimizer {ref_indx_x ref_indx_y ref_indx_z xOrigen yOrigen zOrigen xdelta 
          foreach yy [list -1 0 1] {
             foreach xx [list -1 0 1] {
 
+               # Skip checking the point against itself
+               if {$xx == 0 && $yy == 0 && $zz == 0} {
+                  continue
+               }
+
                set testx [expr $refx + $xx]
                set testy [expr $refy + $yy]
                set testz [expr $refz + $zz]
 
-               if {$testx < 0 || ($testx >= $endgridX)} {puts "Point out of grid in X. Ignoring.";continue}
-               if {$testy < 0 || ($testy >= $endgridY)} {puts "Point out of grid in Y. Ignoring.";continue}
-               if {$testz < 0 || ($testz >= $endgridZ)} {puts "Point out of grid in Z. Ignoring.";continue}
+               if {$testx < 0 || ($testx >= $endgridX)} {puts "Point out of grid in X. Ignoring.";return [list]}
+               if {$testy < 0 || ($testy >= $endgridY)} {puts "Point out of grid in Y. Ignoring.";return [list]}
+               if {$testz < 0 || ($testz >= $endgridZ)} {puts "Point out of grid in Z. Ignoring.";return [list]}
+
+               # Defensive check: ensure the (in-bounds) neighbor actually exists in the grid array
+               #if { ![info exists grilla($testx,$testy,$testz)] } {
+               #   puts stderr "Optimizer Error: Neighbor point ($testx $testy $testz) is within bounds but does not exist in grid. Aborting."
+               #   return [list] ; # Abort due to inconsistent grid data
+               #}
 
                set Gtest $grilla($testx,$testy,$testz)
                if { $Gtest < $Gmin } {
@@ -791,7 +797,11 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
    global grilla
    
    set opt_list [list ]
-   set out_fh [open $outfile w]
+   #set out_fh [open $outfile w]
+   if {[catch {set out_fh [open $outfile w]} errmsg]} {
+      puts stderr "Error: Could not open output file '$outfile' for writing: $errmsg"
+      return
+   }
    set total [expr int($endgridX * $endgridY * $endgridZ )]
 
    set minfound 0
@@ -807,28 +817,40 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
       #puts " $ndx_x  $ndx_y  $ndx_z "
       #puts ""
       puts "POINT No $cnt / $total "
-      #puts "Entering optimizer"
-      set opt [optimizer $ndx_x $ndx_y $ndx_z $xOrigen $yOrigen $zOrigen $xdelta $ydelta $zdelta $endgridX $endgridY $endgridZ]
-      #puts "Finished optimizer"
+      set opt [optimizer $ndx_x $ndx_y $ndx_z $endgridX $endgridY $endgridZ]
+      # Check if optimizer aborted (returned empty list)
+      if {[llength $opt] == 0} {
+         # Optimizer aborted for this starting point (e.g., out of bounds, or initial point invalid).
+         # Message might have been printed by optimizer.
+         puts "Optimization out of bounds for starting point ($ndx_x, $ndx_y, $ndx_z)."
+         incr cnt
+         continue ; # Skip to the next starting point in the loops
+      }
       set Gmin [lindex $opt 3]
+      # Add to list if energy is below threshold and it's a new minimum
+      # Using -exact for lsearch is safer when list elements are themselves lists.
       if { $Gmin < 20.00 && [ lsearch $opt_list $opt ] == -1 } {
          lappend opt_list $opt
       }
       set cnt [expr $cnt + 1]
    }}}
-   puts "FINAL!"
+   puts "FINISHED OPTIMIZATION!"
 
    # Print PDB file with optimized geometries.
    set leaveopen 1
 #   set outfile "min.pdb"
+   set print_cnt 1
+   puts "Printing output"
    foreach a $opt_list {
       set minx [lindex $a 0]
       set miny [lindex $a 1]
       set minz [lindex $a 2]
       set Gmin [lindex $a 3]
-      puts "$minx $miny $minz $Gmin"
-      print_pdb $out_fh $xOrigen $yOrigen $zOrigen $minx $miny $minz $xdelta $ydelta $zdelta $Gmin $cnt $leaveopen
+      puts "printing $print_cnt "
+      print_pdb $out_fh $xOrigen $yOrigen $zOrigen $minx $miny $minz $xdelta $ydelta $zdelta $Gmin $print_cnt $leaveopen
+      incr print_cnt
    }
+   puts "FINISHED PRINTING OUTPUT!"
    close $out_fh
 }
 
@@ -836,12 +858,12 @@ proc global_search_min {ref_coord_list xOrigen yOrigen zOrigen xdelta ydelta zde
 
 proc print_pdb {out_fh xOrigen yOrigen zOrigen refx refy refz xdelta ydelta zdelta Gmin g leaveopen} {
    # Prints a PDB file with the optimized coordinates.
-   set fmt "ATOM  %5d  N   MIN %5d    %8.3f%8.3f%8.3f %5.2f  0.00"
+   set fmt "ATOM  %5s  N   MIN %5s    %8.3f%8.3f%8.3f %5.2f  0.00"
    set pos_x [expr $xOrigen + $refx * $xdelta];
    set pos_y [expr $yOrigen + $refy * $ydelta];
    set pos_z [expr $zOrigen + $refz * $zdelta];
 
-   puts $out_fh [format $fmt 1 1 $pos_x $pos_y $pos_z $Gmin ]
+   puts $out_fh [format $fmt $g $g $pos_x $pos_y $pos_z $Gmin ]
 }
 
 
